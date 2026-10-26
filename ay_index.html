@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ayın Evreleri Oyunu</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #090a12, #1d2b4f, #0c1c2e);
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-card {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 25px;
+            border-radius: 18px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+            max-width: 450px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 22px;
+            margin-bottom: 5px;
+        }
+
+        /* Ses Açma Butonu Stili */
+        .sound-btn {
+            background-color: #0ea5e9;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            font-size: 13px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 12px;
+            transition: background 0.2s;
+        }
+        .sound-btn:hover {
+            background-color: #0284c7;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 15px;
+            font-weight: bold;
+            color: #38bdf8;
+            margin-bottom: 15px;
+            background: rgba(0,0,0,0.3);
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+
+        #timer-bar-container {
+            width: 100%;
+            height: 8px;
+            background: #334155;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            display: none;
+        }
+
+        #timer-bar {
+            width: 100%;
+            height: 100%;
+            background: #22c55e;
+            transition: width 0.1s linear;
+        }
+
+        .moon-box {
+            width: 160px;
+            height: 160px;
+            margin: 0 auto 15px auto;
+            background-color: #050508;
+            border-radius: 50%;
+            border: 3px solid #3d4f7a;
+            box-shadow: 0 0 25px rgba(255,255,255,0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .moon-box svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .question-text {
+            font-size: 15px;
+            margin-bottom: 15px;
+            color: #cbd5e1;
+        }
+
+        .buttons-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            background-color: #4f46e5;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background-color: #4338ca;
+            transform: translateY(-2px);
+        }
+
+        #result-box {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            display: none;
+            line-height: 1.4;
+        }
+
+        .correct {
+            background-color: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+            border: 1px solid #22c55e;
+        }
+
+        .wrong {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid #ef4444;
+        }
+
+        #win-screen {
+            display: none;
+        }
+        
+        #win-screen h2 {
+            color: #4ade80;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-card">
+        <h1>Ayın Evreleri Oyunu 🌙</h1>
+        <!-- Tarayıcı bloklamasını aşmak için ses etkinleştirme butonu -->
+        <button class="sound-btn" onclick="initAudio()">🔊 Sesi Etkinleştir</button>
+        
+        <!-- Oyun Alanı -->
+        <div id="game-area">
+            <div class="stats">
+                <div>Skor: <span id="score">0</span></div>
+                <div>Doğru: <span id="correct-count">0</span> / 20</div>
+            </div>
+
+            <div id="timer-bar-container">
+                <div id="timer-bar"></div>
+            </div>
+
+            <div class="moon-box" id="moon-container"></div>
+
+            <div class="question-text">Bu hangi Ay evresidir?</div>
+
+            <div class="buttons-grid" id="buttons-container"></div>
+
+            <div id="result-box"></div>
+        </div>
+
+        <!-- 20 Soru Bilinince Çıkacak Tebrik Ekranı -->
+        <div id="win-screen">
+            <h2>🏆 Muhteşem Usta!</h2>
+            <p style="font-size: 16px; margin-bottom: 20px;">20 sorunun tümünü başarıyla bildin!</p>
+            <button onclick="restartGame()">Tekrar Oyna</button>
+        </div>
+    </div>
+
+    <script>
+        const allPhases = [
+            { 
+                name: "Yeni Ay", 
+                svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="#111827"/></svg>`, 
+                desc: "Ay, Güneş ile Dünya arasındadır. Aydınlık yüzü Güneş'e baktığı için Dünya'dan bakanlar bu evrede Ay'ı karanlık görür." 
+            },
+            { 
+                name: "Hilal", 
+                svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="#111827"/><path d="M 50 5 A 45 45 0 0 1 50 95 A 25 45 0 0 0 50 5" fill="#fef08a"/></svg>`, 
+                desc: "Yeni ay ile ilk dördün arasında görülür. Ay, Dünya ile Güneş'e göre açı değiştirdiğinden sağ tarafı ince bir yay şeklinde aydınlanır." 
+            },
+            { 
+                name: "İlk Dördün", 
+                svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="#111827"/><path d="M 50 5 A 45 45 0 0 1 50 95 Z" fill="#fef08a"/></svg>`, 
+                desc: "Ay, Dünya etrafındaki hareketinde 90 derecelik açıya gelmiştir. Sağ yarısı aydınlık görünür ve harf olarak D şeklini alır." 
+            },
+            { 
+                name: "Şişkin Ay", 
+                svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="#111827"/><path d="M 50 5 A 45 45 0 0 1 50 95 A 25 45 0 0 1 50 5" fill="#fef08a"/></svg>`, 
+                desc: "İlk dördün ile dolunay arasındadır. Ay'ın yüzeyinin büyük bir kısmı Dünya'dan aydınlık olarak izlenir." 
+            },
+            { 
+                name: "Dolunay", 
+                svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="#fef08a"/></svg>`, 
+                desc: "Dünya, Güneş ile Ay'ın tam ortasındadır. Ay'ın aydınlık yüzü tamamen Dünya'ya dönüktür ve parlak daire şeklinde görülür." 
+            },
+            { 
+                name: "Son Dördün", 
+                svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="#111827"/><path d="M 50 5 A 45 45 0 0 0 50 95 Z" fill="#fef08a"/></svg>`, 
+                desc: "Dolunaydan sonra Ay 270 derecelik konuma gelir Sol yarısı aydınlık görünür ve ters D harfi şeklini alır" 
+            }
+        ];
+
+        let score = 0;
+        let correctCount = 0;
+        let currentPhase = null;
+        let timerInterval = null;
+        let timeLeft = 8;
+
+        const gameArea = document.getElementById("game-area");
+        const winScreen = document.getElementById("win-screen");
+        const moonContainer = document.getElementById("moon-container");
+        const scoreEl = document.getElementById("score");
+        const correctCountEl = document.getElementById("correct-count");
+        const buttonsContainer = document.getElementById("buttons-container");
+        const resultBox = document.getElementById("result-box");
+        const timerBarContainer = document.getElementById("timer-bar-container");
+        const timerBar = document.getElementById("timer-bar");
+
+        // Ses motorunu aktifleştiren tetikleyici
+        function initAudio() {
+            if ('speechSynthesis' in window) {
+                let utterance = new SpeechSynthesisUtterance("Ses sistemi aktif edildi.");
+                utterance.lang = 'tr-TR';
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert("Tarayıcınız ses sentezini desteklemiyor.");
+            }
+        }
+
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                let utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'tr-TR';
+                utterance.rate = 1.0;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function loadQuestion() {
+            if (correctCount >= 20) {
+                gameArea.style.display = "none";
+                winScreen.style.display = "block";
+                speakText("Tebrikler usta! 20 sorunun hepsini bildin.");
+                return;
+            }
+
+            resultBox.style.display = "none";
+            resultBox.className = "";
+            clearInterval(timerInterval);
+
+            if (correctCount >= 3) {
+                timerBarContainer.style.display = "block";
+                timeLeft = 8;
+                timerBar.style.width = "100%";
+                startTimer();
+            } else {
+                timerBarContainer.style.display = "none";
+            }
+
+            currentPhase = allPhases[Math.floor(Math.random() * allPhases.length)];
+            moonContainer.innerHTML = currentPhase.svg;
+
+            let choices = [currentPhase.name];
+            while (choices.length < 4) {
+                let randomP = allPhases[Math.floor(Math.random() * allPhases.length)].name;
+                if (!choices.includes(randomP)) {
+                    choices.push(randomP);
+                }
+            }
+            choices.sort(() => Math.random() - 0.5);
+
+            buttonsContainer.innerHTML = "";
+            choices.forEach(choice => {
+                const btn = document.createElement("button");
+                btn.textContent = choice;
+                btn.onclick = () => handleAnswer(choice);
+                buttonsContainer.appendChild(btn);
+            });
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timeLeft -= 0.1;
+                let percent = (timeLeft / 8) * 100;
+                timerBar.style.width = percent + "%";
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleAnswer("SüreBitti");
+                }
+            }, 100);
+        }
+
+        function handleAnswer(selected) {
+            clearInterval(timerInterval);
+            const buttons = buttonsContainer.querySelectorAll("button");
+            buttons.forEach(b => b.disabled = true);
+
+            resultBox.style.display = "block";
+
+            if (selected === currentPhase.name) {
+                score += 10;
+                correctCount += 1;
+                resultBox.className = "correct";
+                resultBox.innerHTML = `<strong>🎉 Doğru!</strong><br>${currentPhase.desc}`;
+                speakText(`Doğru! ${currentPhase.name}. Konumu: ${currentPhase.desc}`);
+            } else {
+                resultBox.className = "wrong";
+                resultBox.innerHTML = `<strong>❌ Yanlış / Süre Bitti! (Doğru: ${currentPhase.name})</strong><br>${currentPhase.desc}`;
+                speakText(`Yanlış cevap. Doğrusu ${currentPhase.name}. ${currentPhase.desc}`);
+            }
+
+            scoreEl.textContent = score;
+            correctCountEl.textContent = correctCount;
+
+            setTimeout(loadQuestion, 4500);
+        }
+
+        function restartGame() {
+            score = 0;
+            correctCount = 0;
+            scoreEl.textContent = score;
+            correctCountEl.textContent = correctCount;
+            winScreen.style.display = "none";
+            gameArea.style.display = "block";
+            loadQuestion();
+        }
+
+        loadQuestion();
+    </script>
+</body>
+</html>

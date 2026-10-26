@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2.5D Korku Oyunu - Keraj's Games</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050505;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #ui {
+            margin-bottom: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            color: #ff5555;
+            display: flex;
+            gap: 20px;
+        }
+
+        #game-container {
+            position: relative;
+            border: 2px solid #333;
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.3);
+            width: 800px;
+            height: 600px;
+        }
+
+        canvas {
+            display: block;
+            background-color: #000;
+            cursor: crosshair;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 800px;
+            height: 600px;
+            background-color: rgba(5, 5, 5, 0.96);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .logo-container {
+            width: 150px;
+            height: 150px;
+            margin-bottom: 20px;
+            animation: pulseLogo 2s infinite alternate;
+        }
+
+        .studio-title {
+            color: #ccc;
+            font-size: 18px;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
+
+        .menu-title {
+            font-size: 42px;
+            color: #ff3333;
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.7);
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+            text-align: center;
+        }
+
+        .menu-subtitle {
+            font-size: 16px;
+            color: #aaa;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 240px;
+        }
+
+        .btn {
+            background-color: #1a1a1a;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
+        .btn:hover {
+            background-color: #ff3333;
+            border-color: #ff3333;
+            box-shadow: 0 0 15px rgba(255, 51, 51, 0.6);
+            transform: translateY(-2px);
+        }
+
+        @keyframes pulseLogo {
+            from { transform: scale(0.95); opacity: 0.8; }
+            to { transform: scale(1.05); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div>Bölüm: <span id="levelNum" style="color:#ffff55;">1</span></div>
+        <div>Paralar: <span id="score">0</span> / 3</div>
+        <div>Anahtar: <span id="keysCount">Yok</span></div>
+        <div>Kapı: <span id="doorStatus" style="color: #ff4444;">Kilitli</span></div>
+        <div>Durum: <span id="status" style="color: #55ff55;">Geziniyorsun</span></div>
+    </div>
+
+    <div id="game-container">
+        <!-- Logo Ekranı -->
+        <div id="splashScreen" class="overlay">
+            <div class="logo-container">
+                <svg viewBox="0 0 200 200" width="100%" height="100%">
+                    <circle cx="100" cy="100" r="95" fill="#000" stroke="#777" stroke-width="4"/>
+                    <path d="M 50 45 L 50 155 M 50 100 L 90 60 M 50 100 L 105 145" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <path d="M 155 70 A 45 45 0 1 0 155 130 L 155 105 L 120 105" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </svg>
+            </div>
+            <div class="studio-title">KERAJ'S GAMES</div>
+        </div>
+
+        <!-- Ana Menü -->
+        <div id="mainMenu" class="overlay" style="display: none;">
+            <div class="menu-title">KARANLIKTA</div>
+            <div class="menu-subtitle">Zorluk Derecesini Seç</div>
+            <div class="btn-group">
+                <button class="btn" onclick="startGame('easy')">Kolay</button>
+                <button class="btn" onclick="startGame('medium')">Orta</button>
+                <button class="btn" onclick="startGame('hard')">Zor</button>
+            </div>
+        </div>
+
+        <!-- Oyun Bitti / Kazanma Ekranı (Butonlu Arayüz) -->
+        <div id="endScreen" class="overlay" style="display: none;">
+            <div id="endTitle" class="menu-title" style="color: #ff3333;">YAKALANDIN!</div>
+            <div id="endSubtitle" class="menu-subtitle">Canavardan kaçamadın...</div>
+            <div class="btn-group">
+                <button class="btn" onclick="restartCurrentGame()">Yeniden Oyna</button>
+                <button class="btn" onclick="returnToMainMenu()">Ana Menüye Dön</button>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playCoinSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            let now = audioCtx.currentTime;
+            let osc1 = audioCtx.createOscillator();
+            let gain1 = audioCtx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(987.77, now);
+            gain1.gain.setValueAtTime(0.3, now);
+            gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+            osc1.connect(gain1);
+            gain1.connect(audioCtx.destination);
+            osc1.start(now);
+            osc1.stop(now + 0.3);
+
+            let osc2 = audioCtx.createOscillator();
+            let gain2 = audioCtx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(1318.51, now + 0.08);
+            gain2.gain.setValueAtTime(0.3, now + 0.08);
+            gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            osc2.start(now + 0.08);
+            osc2.stop(now + 0.4);
+        }
+
+        function playScreamSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            let now = audioCtx.currentTime;
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.exponentialRampToValueAtTime(250, now + 1.2);
+            gain.gain.setValueAtTime(0.5, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 1.2);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 1.2);
+        }
+
+        let currentLevel = 1;
+        let selectedDifficulty = 'medium';
+        let player = { x: 50, y: 50, radius: 12, speed: 3, angle: 0, isHiding: false, flashlightRadius: 150 };
+        let monster = { x: 350, y: 500, radius: 14, speed: 2.0 };
+        let keysPressed = { w: false, s: false, a: false, d: false };
+
+        window.addEventListener("keydown", (e) => {
+            if (e.code === "KeyW" || e.code === "ArrowUp") keysPressed.w = true;
+            if (e.code === "KeyS" || e.code === "ArrowDown") keysPressed.s = true;
+            if (e.code === "KeyA" || e.code === "ArrowLeft") keysPressed.a = true;
+            if (e.code === "KeyD" || e.code === "ArrowRight") keysPressed.d = true;
+        });
+
+        window.addEventListener("keyup", (e) => {
+            if (e.code === "KeyW" || e.code === "ArrowUp") keysPressed.w = false;
+            if (e.code === "KeyS" || e.code === "ArrowDown") keysPressed.s = false;
+            if (e.code === "KeyA" || e.code === "ArrowLeft") keysPressed.a = false;
+            if (e.code === "KeyD" || e.code === "ArrowRight") keysPressed.d = false;
+        });
+
+        canvas.addEventListener("mousemove", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            player.angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+        });
+
+        // BÖLÜM 1
+        let level1Data = {
+            walls: [
+                { x: 0, y: 0, w: 800, h: 20 },
+                { x: 0, y: 580, w: 800, h: 20 },
+                { x: 0, y: 0, w: 20, h: 600 },
+                { x: 780, y: 0, w: 20, h: 600 },
+                { x: 400, y: 0, w: 20, h: 250 },
+                { x: 400, y: 350, w: 20, h: 250 }
+            ],
+            door: { x: 400, y: 250, w: 20, h: 100, isOpen: false },
+            keyItem: { x: 100, y: 500, collected: false },
+            coins: [
+                { x: 100, y: 100, collected: false },
+                { x: 180, y: 350, collected: false },
+                { x: 60, y: 250, collected: false }
+            ],
+            hidingSpots: [
+                { x: 40, y: 520, w: 45, h: 45 }
+            ],
+            hiddenZone: { x: 420, y: 0, w: 380, h: 600 }
+        };
+
+        // BÖLÜM 2
+        let level2Data = {
+            walls: [
+                { x: 0, y: 0, w: 800, h: 20 },
+                { x: 0, y: 580, w: 800, h: 20 },
+                { x: 0, y: 0, w: 20, h: 600 },
+                { x: 780, y: 0, w: 20, h: 600 },
+                { x: 400, y: 0, w: 20, h: 250 },
+                { x: 400, y: 350, w: 20, h: 250 },
+                { x: 200, y: 200, w: 200, h: 20 }
+            ],
+            door: { x: 400, y: 250, w: 20, h: 100, isOpen: true },
+            keyItem: { x: 700, y: 100, collected: false },
+            coins: [
+                { x: 500, y: 100, collected: false },
+                { x: 700, y: 500, collected: false },
+                { x: 550, y: 350, collected: false },
+                { x: 300, y: 500, collected: false }
+            ],
+            hidingSpots: [
+                { x: 710, y: 40, w: 45, h: 45 },
+                { x: 40, y: 40, w: 45, h: 45 }
+            ],
+            hiddenZone: null
+        };
+
+        let currentData = level1Data;
+        let score = 0;
+        let totalCoins = 3;
+        let hasKey = false;
+        let gameOver = false;
+        let gameWin = false;
+        let levelTransition = false;
+        let gameRunning = false;
+        let baseMonsterSpeed = 2.0;
+
+        setTimeout(() => {
+            document.getElementById("splashScreen").style.display = "none";
+            document.getElementById("mainMenu").style.display = "flex";
+        }, 3000);
+
+        function startGame(difficulty) {
+            selectedDifficulty = difficulty;
+            document.getElementById("mainMenu").style.display = "none";
+            document.getElementById("endScreen").style.display = "none";
+            applyDifficulty(difficulty);
+            resetGame(1);
+            gameRunning = true;
+            gameLoop();
+        }
+
+        function applyDifficulty(difficulty) {
+            if (difficulty === 'easy') {
+                baseMonsterSpeed = 1.3;
+                player.speed = 3.2;
+                player.flashlightRadius = 180;
+            } else if (difficulty === 'medium') {
+                baseMonsterSpeed = 1.9;
+                player.speed = 3.0;
+                player.flashlightRadius = 150;
+            } else if (difficulty === 'hard') {
+                baseMonsterSpeed = 2.5;
+                player.speed = 2.8;
+                player.flashlightRadius = 120;
+            }
+        }
+
+        function resetGame(level) {
+            currentLevel = level;
+            gameOver = false;
+            gameWin = false;
+            levelTransition = false;
+            score = 0;
+            hasKey = false;
+            document.getElementById("endScreen").style.display = "none";
+
+            if (level === 1) {
+                level1Data.keyItem.collected = false;
+                level1Data.door.isOpen = false;
+                level1Data.coins.forEach(c => c.collected = false);
+                currentData = level1Data;
+                totalCoins = 3;
+                player.x = 50; player.y = 50;
+                monster.x = 350; monster.y = 500;
+                monster.speed = baseMonsterSpeed;
+                document.getElementById("levelNum").innerText = "1";
+            } else {
+                level2Data.keyItem.collected = false;
+                level2Data.door.isOpen = true;
+                level2Data.coins.forEach(c => c.collected = false);
+                currentData = level2Data;
+                totalCoins = 4;
+                player.x = 450; player.y = 300;
+                monster.x = 700; monster.y = 500;
+                monster.speed = baseMonsterSpeed + 0.4;
+                document.getElementById("levelNum").innerText = "2 (SON BÖLÜM)";
+            }
+
+            document.getElementById("score").innerText = "0 / " + totalCoins;
+            document.getElementById("keysCount").innerText = "Yok";
+            document.getElementById("keysCount").style.color = "#ff5555";
+            document.getElementById("doorStatus").innerText = currentLevel === 1 ? "Kilitli" : "Açık";
+            document.getElementById("doorStatus").style.color = currentLevel === 1 ? "#ff4444" : "#55ff55";
+        }
+
+        function restartCurrentGame() {
+            resetGame(currentLevel);
+            gameRunning = true;
+            gameLoop();
+        }
+
+        function returnToMainMenu() {
+            gameRunning = false;
+            gameOver = false;
+            gameWin = false;
+            document.getElementById("endScreen").style.display = "none";
+            document.getElementById("mainMenu").style.display = "flex";
+        }
+
+        function loadLevel2() {
+            levelTransition = true;
+            setTimeout(() => {
+                resetGame(2);
+                levelTransition = false;
+            }, 2000);
+        }
+
+        function checkWallCollision(nx, ny, radius) {
+            let allColliders = [...currentData.walls];
+            if (!currentData.door.isOpen) allColliders.push(currentData.door);
+
+            for (let wall of allColliders) {
+                let closestX = Math.max(wall.x, Math.min(nx, wall.x + wall.w));
+                let closestY = Math.max(wall.y, Math.min(ny, wall.y + wall.h));
+                let distX = nx - closestX;
+                let distY = ny - closestY;
+                if (Math.sqrt((distX * distX) + (distY * distY)) < radius) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function isInFlashlight(px, py) {
+            if (currentLevel === 1 && px > 410) return false;
+
+            let dist = Math.hypot(px - player.x, py - player.y);
+            if (dist > player.flashlightRadius) return false;
+
+            let angleToItem = Math.atan2(py - player.y, px - player.x);
+            let angleDiff = angleToItem - player.angle;
+            
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+            return Math.abs(angleDiff) < 0.6;
+        }
+
+        function update() {
+            if (gameOver || gameWin || levelTransition || !gameRunning) return;
+
+            player.isHiding = false;
+            for (let spot of currentData.hidingSpots) {
+                if (player.x > spot.x && player.x < spot.x + spot.w &&
+                    player.y > spot.y && player.y < spot.y + spot.h) {
+                    player.isHiding = true;
+                    break;
+                }
+            }
+
+            document.getElementById("status").innerText = player.isHiding ? "Gizleniyorsun 🤫" : "Geziniyorsun";
+            document.getElementById("status").style.color = player.isHiding ? "#55ffff" : "#55ff55";
+
+            let newX = player.x;
+            let newY = player.y;
+            if (keysPressed.w) newY -= player.speed;
+            if (keysPressed.s) newY += player.speed;
+            if (!checkWallCollision(newX, newY, player.radius)) player.y = newY;
+
+            newX = player.x;
+            newY = player.y;
+            if (keysPressed.a) newX -= player.speed;
+            if (keysPressed.d) newX += player.speed;
+            if (!checkWallCollision(newX, newY, player.radius)) player.x = newX;
+
+            if (!player.isHiding) {
+                let angleToPlayer = Math.atan2(player.y - monster.y, player.x - monster.x);
+                let mNewX = monster.x + Math.cos(angleToPlayer) * monster.speed;
+                let mNewY = monster.y + Math.sin(angleToPlayer) * monster.speed;
+                
+                if (!checkWallCollision(mNewX, monster.y, monster.radius)) monster.x = mNewX;
+                if (!checkWallCollision(monster.x, mNewY, monster.radius)) monster.y = mNewY;
+            }
+
+            let distToMonster = Math.hypot(player.x - monster.x, player.y - monster.y);
+            if (distToMonster < player.radius + monster.radius && !player.isHiding) {
+                gameOver = true;
+                playScreamSound();
+                showEndScreen(false);
+            }
+
+            if (!hasKey && !currentData.keyItem.collected && isInFlashlight(currentData.keyItem.x, currentData.keyItem.y)) {
+                if (Math.hypot(player.x - currentData.keyItem.x, player.y - currentData.keyItem.y) < player.radius + 12) {
+                    currentData.keyItem.collected = true;
+                    hasKey = true;
+                    document.getElementById("keysCount").innerText = "Var";
+                    document.getElementById("keysCount").style.color = "#00ffff";
+                    playCoinSound();
+                }
+            }
+
+            if (!currentData.door.isOpen && hasKey) {
+                let distToDoor = Math.hypot(player.x - (currentData.door.x + currentData.door.w/2), player.y - (currentData.door.y + currentData.door.h/2));
+                if (distToDoor < 45) {
+                    currentData.door.isOpen = true;
+                    document.getElementById("doorStatus").innerText = "Açık";
+                    document.getElementById("doorStatus").style.color = "#55ff55";
+                    playCoinSound();
+                }
+            }
+
+            for (let coin of currentData.coins) {
+                if (!coin.collected && isInFlashlight(coin.x, coin.y)) {
+                    if (Math.hypot(player.x - coin.x, player.y - coin.y) < player.radius + 12) {
+                        coin.collected = true;
+                        score++;
+                        document.getElementById("score").innerText = score + " / " + totalCoins;
+                        playCoinSound();
+                    }
+                }
+            }
+
+            if (currentData.door.isOpen && score === totalCoins) {
+                let distToExit = Math.hypot(player.x - (currentData.door.x + currentData.door.w/2), player.y - (currentData.door.y + currentData.door.h/2));
+                if (distToExit < 35) {
+                    if (currentLevel === 1) {
+                        loadLevel2();
+                    } else if (currentLevel === 2) {
+                        gameWin = true;
+                        showEndScreen(true);
+                    }
+                }
+            }
+        }
+
+        function showEndScreen(isWin) {
+            const endScreen = document.getElementById("endScreen");
+            const endTitle = document.getElementById("endTitle");
+            const endSubtitle = document.getElementById("endSubtitle");
+
+            if (isWin) {
+                endTitle.innerText = "TÜM BÖLÜMLER BİTTİ!";
+                endTitle.style.color = "#00ff88";
+                endSubtitle.innerText = "Tebrikler, karanlıktan kaçmayı başardın!";
+            } else {
+                endTitle.innerText = "YAKALANDIN!";
+                endTitle.style.color = "#ff3333";
+                endSubtitle.innerText = "Canavar seni avladı...";
+            }
+            endScreen.style.display = "flex";
+        }
+
+        function draw() {
+            ctx.fillStyle = "#030303";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (!gameRunning) return;
+
+            for (let spot of currentData.hidingSpots) {
+                ctx.fillStyle = "rgba(68, 255, 136, 0.25)";
+                ctx.fillRect(spot.x, spot.y, spot.w, spot.h);
+                ctx.strokeStyle = "#44ff88";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(spot.x, spot.y, spot.w, spot.h);
+            }
+
+            ctx.fillStyle = "#1a1a1f";
+            ctx.strokeStyle = "#333";
+            ctx.lineWidth = 2;
+            for (let wall of currentData.walls) {
+                ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+                ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
+            }
+
+            if (!currentData.door.isOpen) {
+                ctx.fillStyle = "#772222";
+                ctx.fillRect(currentData.door.x, currentData.door.y, currentData.door.w, currentData.door.h);
+                ctx.strokeStyle = "#ff4444";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(currentData.door.x, currentData.door.y, currentData.door.w, currentData.door.h);
+            }
+
+            if (!hasKey && isInFlashlight(currentData.keyItem.x, currentData.keyItem.y)) {
+                ctx.beginPath();
+                ctx.arc(currentData.keyItem.x, currentData.keyItem.y, 7, 0, Math.PI * 2);
+                ctx.fillStyle = "#00ffff";
+                ctx.shadowColor = "#00ffff";
+                ctx.shadowBlur = 12;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            for (let coin of currentData.coins) {
+                if (!coin.collected && isInFlashlight(coin.x, coin.y)) {
+                    ctx.beginPath();
+                    ctx.arc(coin.x, coin.y, 7, 0, Math.PI * 2);
+                    ctx.fillStyle = "#ffd700";
+                    ctx.shadowColor = "#ffd700";
+                    ctx.shadowBlur = 12;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            }
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(player.x, player.y);
+            ctx.arc(player.x, player.y, player.flashlightRadius, player.angle - 0.6, player.angle + 0.6);
+            ctx.lineTo(player.x, player.y);
+            ctx.closePath();
+            
+            let gradient = ctx.createRadialGradient(player.x, player.y, 5, player.x, player.y, player.flashlightRadius);
+            gradient.addColorStop(0, "rgba(255, 255, 220, 0.6)");
+            gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+            
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            ctx.restore();
+
+            let distToMonster = Math.hypot(player.x - monster.x, player.y - monster.y);
+            if (isInFlashlight(monster.x, monster.y) || distToMonster < 60) {
+                ctx.beginPath();
+                ctx.arc(monster.x, monster.y, monster.radius, 0, Math.PI * 2);
+                ctx.fillStyle = "#ff0000";
+                ctx.shadowColor = "red";
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            if (currentData.hiddenZone) {
+                ctx.fillStyle = "#000000";
+                ctx.fillRect(currentData.hiddenZone.x, currentData.hiddenZone.y, currentData.hiddenZone.w, currentData.hiddenZone.h);
+                ctx.strokeStyle = "#111";
+                ctx.beginPath();
+                ctx.moveTo(currentData.hiddenZone.x, 0);
+                ctx.lineTo(currentData.hiddenZone.x, 600);
+                ctx.stroke();
+            }
+
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fillStyle = player.isHiding ? "#44ff88" : "#aaa";
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.stroke();
+
+            if (levelTransition) {
+                ctx.fillStyle = "rgba(0, 0, 0, 0.95)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "#55ff55";
+                ctx.font = "bold 32px sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText("BÖLÜM 1 TAMAMLANDI!", canvas.width / 2, canvas.height / 2 - 20);
+                ctx.fillStyle = "#fff";
+                ctx.font = "20px sans-serif";
+                ctx.fillText("2. Oda Açılıyor...", canvas.width / 2, canvas.height / 2 + 30);
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            if (gameRunning) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+    </script>
+</body>
+</html>
