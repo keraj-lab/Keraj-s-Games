@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="tr" class="h-full bg-slate-950 text-slate-100 select-none">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Craftium Ultimate - 3D Minecraft Voxel Engine</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- PointerLockControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        craft: { 500: '#10b981', 600: '#059669', 700: '#047857' },
+                        voxel: { dark: '#0a0f1d', panel: '#131b2e', border: '#1f2d4d' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 0; }
+        .hud-glass { background: rgba(10, 15, 29, 0.82); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.12); }
+        .glass-panel { background: rgba(19, 27, 46, 0.94); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.15); }
+        
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 14px;
+            height: 14px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 20;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 4px rgba(0,0,0,0.9);
+        }
+        #crosshair::before { top: 6px; left: 0; width: 14px; height: 2px; }
+        #crosshair::after { top: 0; left: 6px; width: 2px; height: 14px; }
+
+        .hotbar-slot {
+            width: 52px;
+            height: 52px;
+            background: rgba(15, 23, 42, 0.88);
+            border: 2px solid rgba(255, 255, 255, 0.18);
+            border-radius: 12px;
+            transition: all 0.15s ease;
+        }
+        .hotbar-slot.active {
+            border-color: #10b981;
+            box-shadow: 0 0 16px rgba(16, 185, 129, 0.7);
+            transform: scale(1.08);
+            background: rgba(16, 185, 129, 0.2);
+        }
+
+        .craft-slot {
+            width: 48px;
+            height: 48px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .craft-slot:hover { border-color: #10b981; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.5); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.8); }
+    </style>
+</head>
+<body class="h-full w-full overflow-hidden flex flex-col antialiased">
+
+    <!-- 3D Voksel Oyun Tuval Konteyneri -->
+    <div id="canvas-container"></div>
+
+    <!-- Ekran Ortası Nişangah -->
+    <div id="crosshair" class="hidden"></div>
+
+    <!-- BAŞLANGIÇ & DÜNYA OLUŞTURMA ANA MENÜSÜ -->
+    <div id="main-menu" class="absolute inset-0 z-40 flex flex-col items-center justify-center bg-slate-950/92 backdrop-blur-xl p-6">
+        <div class="max-w-2xl w-full glass-panel p-8 rounded-3xl border border-emerald-500/30 shadow-2xl flex flex-col space-y-6">
+            <div class="flex items-center space-x-4 border-b border-slate-800 pb-4">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white text-3xl font-black shadow-lg shadow-emerald-500/30">
+                    <i class="fa-solid fa-cubes"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-black text-white tracking-wide">CRAFTIUM ULTIMATE - 3D Minecraft Motoru</h1>
+                    <p class="text-xs text-emerald-400 font-mono">Derin Yer Kabuğu, Katman Kayası, Kraftlama, Köyler & Gece Zombileri</p>
+                </div>
+            </div>
+
+            <!-- Menü Sekmeleri -->
+            <div class="flex space-x-3 border-b border-slate-800 pb-3">
+                <button onclick="switchMenuTab('create')" id="btn-menu-create" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs transition-all">
+                    <i class="fa-solid fa-plus mr-1.5"></i>Yeni Dünya Oluştur
+                </button>
+                <button onclick="switchMenuTab('load')" id="btn-menu-load" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-all">
+                    <i class="fa-solid fa-floppy-disk mr-1.5"></i>Kayıtlı Dünyalar
+                </button>
+            </div>
+
+            <!-- Sekme 1: Yeni Dünya Oluştur -->
+            <div id="tab-content-create" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Dünya Adı</label>
+                    <input type="text" id="input-world-name" value="Minecraft Dünyam" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-emerald-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Tohum (Seed)</label>
+                        <input type="number" id="input-world-seed" value="987654" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Dünya Ölçeği & Biyomlar</label>
+                        <select id="select-biome" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-emerald-500 focus:outline-none">
+                            <option value="giant">Devasa Dünya (20x Ölçek, Köyler, Nehirler, Derin Yer Kabuğu)</option>
+                            <option value="flat">Düz Dünya</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="startNewGame()" class="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl text-sm shadow-xl transition-all flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-play"></i>
+                    <span>DÜNYAYI BAŞLAT VE OYNA</span>
+                </button>
+            </div>
+
+            <!-- Sekme 2: Kayıtlı Dünyalar -->
+            <div id="tab-content-load" class="hidden space-y-3 max-h-60 overflow-y-auto pr-1">
+                <div id="saved-worlds-list" class="space-y-2">
+                    <!-- JS ile yüklenir -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OYUN İÇİ DURAKLATMA MENÜSÜ -->
+    <div id="pause-screen" class="hidden absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/85 backdrop-blur-md text-center p-6 cursor-pointer">
+        <div class="max-w-md glass-panel p-6 rounded-3xl border border-emerald-500/30 shadow-2xl flex flex-col items-center space-y-4">
+            <h2 class="text-xl font-bold text-white">OYUN DURAKLATILDI</h2>
+            <p class="text-xs text-slate-300">Devam etmek için ekrana veya Esc tuşuna basın.</p>
+            <div class="w-full space-y-2">
+                <button onclick="saveCurrentWorld()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all">
+                    <i class="fa-solid fa-floppy-disk mr-1.5"></i>Dünyayı Kaydet (Local Save)
+                </button>
+                <button onclick="returnToMainMenu()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-all">
+                    <i class="fa-solid fa-house mr-1.5"></i>Ana Menüye Dön
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD VE OYUN ARAYÜZÜ -->
+    <div id="ui-layer" class="relative z-10 flex flex-col justify-between h-full w-full pointer-events-none p-4 select-none">
+        
+        <!-- ÜST HUD BARI -->
+        <div class="flex justify-between items-start w-full">
+            <!-- Sol Üst: Dünya Bilgileri -->
+            <div class="hud-glass p-3 rounded-2xl flex flex-col space-y-1 text-xs font-mono pointer-events-auto shadow-xl">
+                <div class="flex items-center space-x-2 text-emerald-400 font-bold">
+                    <i class="fa-solid fa-cube"></i>
+                    <span id="active-world-title">MINECRAFT DÜNYASI</span>
+                </div>
+                <div class="text-slate-300">Konum: <span id="pos-display" class="text-amber-300">X: 0, Y: 40, Z: 0</span></div>
+                <div class="flex space-x-3 text-[11px] text-slate-400">
+                    <span>FPS: <b id="fps-display" class="text-emerald-400">60</b></span>
+                    <span>Canlılar: <b id="mob-count" class="text-amber-400">0</b></span>
+                    <span>Biyom: <b id="biome-display" class="text-sky-400">Ova & Nehir</b></span>
+                </div>
+            </div>
+
+            <!-- Üst Orta: Navigasyon ve İpuçları -->
+            <div class="flex flex-col items-center space-y-2 pointer-events-auto">
+                <div class="hud-glass px-2 py-1.5 rounded-2xl flex space-x-1 shadow-lg">
+                    <button onclick="switchTab('game')" id="btn-tab-game" class="px-4 py-2 rounded-xl text-xs font-semibold transition-all bg-emerald-600 text-white shadow-md">
+                        <i class="fa-solid fa-gamepad mr-1.5"></i>Oyun
+                    </button>
+                    <button onclick="toggleInventoryModal()" class="px-4 py-2 rounded-xl text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-800/60">
+                        <i class="fa-solid fa-box-open mr-1.5"></i>Envanter & Kraft (E)
+                    </button>
+                    <button onclick="switchTab('architecture')" id="btn-tab-architecture" class="px-4 py-2 rounded-xl text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-800/60">
+                        <i class="fa-solid fa-code mr-1.5"></i>Java LibGDX Mimarisi
+                    </button>
+                </div>
+
+                <!-- Bildirim Kutusu -->
+                <div id="notification-box" class="opacity-0 transition-opacity duration-300 px-4 py-1.5 rounded-full hud-glass text-xs text-emerald-300 font-medium flex items-center space-x-2 border border-emerald-500/30">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span id="notification-text">Craftium Ultimate Hazır!</span>
+                </div>
+            </div>
+
+            <!-- Sağ Üst: Zaman & Gece/Gündüz Durumu -->
+            <div class="hud-glass p-3 rounded-2xl flex items-center space-x-3 text-xs pointer-events-auto">
+                <div class="text-right">
+                    <div id="clock-display" class="font-mono text-sm font-bold text-amber-300">12:00</div>
+                    <div id="day-display" class="text-[10px] text-slate-400">Gündüz</div>
+                </div>
+                <div class="h-7 w-px bg-slate-700/60"></div>
+                <div id="weather-badge" class="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/50 flex items-center space-x-1.5 text-xs text-emerald-300">
+                    <i class="fa-solid fa-sun text-amber-400" id="time-icon"></i>
+                    <span id="time-text">Açık Güneşli</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SOL KONTROL İPUÇLARI -->
+        <div class="absolute left-4 top-28 hud-glass p-3 rounded-2xl w-60 pointer-events-auto text-xs space-y-1 text-slate-300 shadow-xl border border-slate-700/60">
+            <div class="font-bold text-emerald-400 border-b border-slate-700/60 pb-1 flex items-center justify-between">
+                <span><i class="fa-solid fa-gamepad mr-1.5"></i>Kontroller</span>
+                <span class="text-[10px] text-amber-400 font-mono">Survival</span>
+            </div>
+            <div class="flex justify-between"><span>E Tuşu:</span><span class="font-mono text-emerald-400">Envanter & Kraft</span></div>
+            <div class="flex justify-between"><span>Sol Tık:</span><span class="font-mono text-amber-300">Blok Kır / Saldır</span></div>
+            <div class="flex justify-between"><span>Sağ Tık:</span><span class="font-mono text-sky-400">Blok Koy / Etkileşim</span></div>
+            <div class="flex justify-between"><span>Gece Vakti:</span><span class="font-mono text-rose-400">Zombiler Gelir!</span></div>
+            <div class="flex justify-between"><span>Köyler:</span><span class="font-mono text-emerald-300">Köylüler Var</span></div>
+        </div>
+
+        <!-- ALT HUD (Sağlık, Açlık & Hotbar) -->
+        <div id="game-hud-bottom" class="flex flex-col items-center w-full space-y-2 pointer-events-auto">
+            <div class="flex justify-between items-center w-80 px-2">
+                <!-- Can Kalpleri -->
+                <div id="health-bar" class="flex space-x-1 text-rose-500 text-sm">
+                    <i class="fa-solid fa-heart"></i><i class="fa-solid fa-heart"></i><i class="fa-solid fa-heart"></i><i class="fa-solid fa-heart"></i><i class="fa-solid fa-heart"></i>
+                    <i class="fa-solid fa-heart"></i><i class="fa-solid fa-heart"></i><i class="fa-solid fa-heart"></i><i class="fa-solid fa-heart"></i><i class="fa-solid fa-heart"></i>
+                </div>
+                <!-- Açlık Barları -->
+                <div id="hunger-bar" class="flex space-x-1 text-amber-600 text-sm">
+                    <i class="fa-solid fa-drumstick-bite"></i><i class="fa-solid fa-drumstick-bite"></i><i class="fa-solid fa-drumstick-bite"></i><i class="fa-solid fa-drumstick-bite"></i><i class="fa-solid fa-drumstick-bite"></i>
+                    <i class="fa-solid fa-drumstick-bite"></i><i class="fa-solid fa-drumstick-bite"></i><i class="fa-solid fa-drumstick-bite"></i><i class="fa-solid fa-drumstick-bite"></i><i class="fa-solid fa-drumstick-bite"></i>
+                </div>
+            </div>
+
+            <!-- HOTBAR (BAŞLANGIÇTA BOŞ) -->
+            <div id="hotbar-slots-container" class="hud-glass p-2 rounded-2xl flex space-x-2 shadow-2xl border border-slate-700">
+                <!-- JS ile üretilir -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ENVANTER & KRAFTLAMA PENCERESİ (E TUŞU) -->
+    <div id="modal-inventory" class="hidden absolute inset-0 z-30 bg-slate-950/88 backdrop-blur-md p-6 flex items-center justify-center pointer-events-auto">
+        <div class="max-w-3xl w-full glass-panel p-6 rounded-3xl border border-emerald-500/30 shadow-2xl space-y-5">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-800">
+                <div class="flex items-center space-x-2 text-white font-bold text-lg">
+                    <i class="fa-solid fa-box-open text-emerald-400"></i>
+                    <span id="inventory-title-text">Envanter & Kraftlama (2x2)</span>
+                </div>
+                <button onclick="toggleInventoryModal()" class="p-1.5 text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- ÜST KISIM: KRAFTLAMA MATRİSİ & ÇIKTI -->
+            <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 flex items-center justify-around">
+                <div class="flex flex-col items-center space-y-2">
+                    <div class="text-xs font-bold text-slate-300">Kraft Alanı</div>
+                    <div id="crafting-grid-container" class="grid grid-cols-2 gap-2">
+                        <!-- JS ile 2x2 veya 3x3 slotlar -->
+                    </div>
+                </div>
+
+                <div class="text-2xl text-emerald-400"><i class="fa-solid fa-arrow-right"></i></div>
+
+                <!-- Kraft Çıktı Slotu -->
+                <div class="flex flex-col items-center space-y-2">
+                    <div class="text-xs font-bold text-emerald-400">Üretilen Eşya</div>
+                    <div id="craft-output-slot" onclick="claimCraftResult()" class="w-16 h-16 bg-emerald-950/60 border-2 border-emerald-500/60 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-900/60 transition-all">
+                        <span class="text-xs text-slate-500">Boş</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ALT KISIM: OYUNCU ENVANTER IZGARASI -->
+            <div>
+                <div class="text-xs font-bold text-slate-400 mb-2">Çanta Eşyaları (Tıkla ve Taşı)</div>
+                <div id="inventory-grid" class="grid grid-cols-9 gap-2">
+                    <!-- JS ile üretilir -->
+                </div>
+            </div>
+
+            <div class="text-xs text-slate-400 border-t border-slate-800 pt-3 flex justify-between">
+                <span>Tarifler: Meşe Odunu $\rightarrow$ Tahta, Tahta $\rightarrow$ Çubuk & Çalışma Masası</span>
+                <span class="text-emerald-400 font-semibold">Çalışma Masası ile 3x3 Kraft Açılır</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MİMARİ İNCELEYİCİ PENCERESİ (JAVA LIBGDX) -->
+    <div id="modal-architecture" class="hidden absolute inset-0 z-30 bg-slate-950/92 backdrop-blur-lg p-6 flex flex-col justify-between pointer-events-auto">
+        <div class="flex justify-between items-center pb-4 border-b border-slate-800">
+            <div class="flex items-center space-x-3">
+                <div class="p-2.5 bg-emerald-600/20 text-emerald-400 rounded-2xl border border-emerald-500/30">
+                    <i class="fa-solid fa-cubes-stacked text-2xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-bold text-white">Java LibGDX Minecraft Çekirdek Mimarisi</h2>
+                    <p class="text-xs text-slate-400">Chunk Jeneratörü, Yer Kabuğu, Katman Kayası & Mob Yapay Zekâsı</p>
+                </div>
+            </div>
+            <button onclick="switchTab('game')" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-12 gap-6 my-4 flex-1 overflow-hidden">
+            <div class="col-span-4 glass-panel rounded-2xl p-4 overflow-y-auto space-y-1 text-xs">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Proje Modülleri</div>
+                <div id="file-tree" class="space-y-0.5 font-mono"></div>
+            </div>
+            <div class="col-span-8 glass-panel rounded-2xl p-4 flex flex-col font-mono">
+                <div class="flex justify-between items-center pb-3 mb-3 border-b border-slate-800 text-xs">
+                    <span id="code-file-name" class="text-emerald-400 font-bold flex items-center">
+                        <i class="fa-regular fa-file-code mr-2"></i>core/src/com/craftium/game/world/ChunkGenerator.java
+                    </span>
+                    <button onclick="copyCurrentCode()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition-all text-[11px]">
+                        <i class="fa-regular fa-copy mr-1"></i>Kodu Kopyala
+                    </button>
+                </div>
+                <pre class="flex-1 bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs text-emerald-200 overflow-auto font-mono leading-relaxed" id="code-preview-content"></pre>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- JAVASCRIPT OYUN MOTORU & SİSTEMLERİ -->
+    <script>
+        /* ==========================================================================
+           1. JAVA LIBGDX / LWJGL3 ARCHITECTURE FILES
+           ========================================================================== */
+        const javaArchitectureFiles = {
+            'core/src/com/craftium/game/world/ChunkGenerator.java': `package com.craftium.game.world;
+
+import com.badlogic.gdx.math.MathUtils;
+
+/**
+ * Minecraft Derin Yer Kabuğu ve Katman Kayası Jeneratörü
+ */
+public class ChunkGenerator {
+    public static final int CHUNK_SIZE = 16;
+    public static final int WORLD_HEIGHT = 128;
+    public static final int SEA_LEVEL = 30;
+
+    public void generateChunk(byte[][][] blocks, int chunkX, int chunkZ, long seed) {
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int z = 0; z < CHUNK_SIZE; z++) {
+                int surfaceY = (int)(Math.sin((x + chunkX * 16) * 0.05) * 12 + 42);
+
+                for (int y = 0; y < WORLD_HEIGHT; y++) {
+                    if (y == 0) {
+                        blocks[x][y][z] = 12; // Katman Kayası (Bedrock - Kırılamaz)
+                    } else if (y < surfaceY - 8) {
+                        blocks[x][y][z] = 3;  // Derin Taş & Madenler
+                    } else if (y < surfaceY) {
+                        blocks[x][y][z] = 2;  // Toprak Katmanı
+                    } else if (y == surfaceY) {
+                        blocks[x][y][z] = 1;  // Çim Blok (Üstü Yeşil)
+                    } else if (y <= SEA_LEVEL) {
+                        blocks[x][y][z] = 7;  // Deniz / Nehir Suyu
+                    }
+                }
+            }
+        }
+    }
+}`,
+
+            'core/src/com/craftium/game/mob/ZombieAI.java': `package com.craftium.game.mob;
+
+import com.badlogic.gdx.math.Vector3;
+
+/**
+ * Gece Spawlanan Düşman Zombi Yapay Zekâsı
+ */
+public class ZombieAI {
+    public Vector3 position = new Vector3();
+    public float health = 20.0f;
+    public float speed = 3.2f;
+
+    public void updatePathfinding(Vector3 playerPos, float delta) {
+        Vector3 direction = new Vector3(playerPos).sub(position);
+        direction.y = 0; // Yatay takip
+        if (direction.len() < 18.0f && direction.len() > 1.0f) {
+            direction.nor();
+            position.add(direction.scl(speed * delta));
+        }
+    }
+}`,
+
+            'core/src/com/craftium/game/crafting/CraftingManager.java': `package com.craftium.game.crafting;
+
+import java.util.HashMap;
+
+/**
+ * 2x2 ve 3x3 Tarif Eşleştirme Sistemi
+ */
+public class CraftingManager {
+    public static class Recipe {
+        public int inputId;
+        public int count;
+        public int resultId;
+        public int resultCount;
+    }
+
+    public static Recipe checkRecipe(int[][] grid) {
+        // Meşe Odunu -> 4 Tahta Tarifi
+        if (grid[0][0] == 4) return createRecipe(4, 1, 5, 4);
+        // Tahta -> Çubuk Tarifi
+        if (grid[0][0] == 5 && grid[1][0] == 5) return createRecipe(5, 2, 6, 4);
+        return null;
+    }
+
+    private static Recipe createRecipe(int in, int inC, int out, int outC) {
+        Recipe r = new Recipe();
+        r.inputId = in; r.count = inC; r.resultId = out; r.resultCount = outC;
+        return r;
+    }
+}`
+        };
+
+
+        /* ==========================================================================
+           2. BLOK TANIMLARI & MINECRAFT ÇİM KAPLAMASI
+           ========================================================================== */
+        const BLOCK_TYPES = {
+            1: { id: 1, name: 'Çim Blok', colorTop: 0x557a2b, colorSide: 0x78350f, isGrass: true },
+            2: { id: 2, name: 'Toprak', color: 0x78350f },
+            3: { id: 3, name: 'Taş / Taş Kırığı', color: 0x64748b },
+            4: { id: 4, name: 'Meşe Odunu', colorTop: 0x78350f, colorSide: 0x92400e },
+            5: { id: 5, name: 'Meşe Tahtası', color: 0xb45309 },
+            6: { id: 6, name: 'Çubuk', color: 0xd97706, isTool: true },
+            7: { id: 7, name: 'Su', color: 0x0284c7, transparent: true, opacity: 0.65, isLiquid: true },
+            8: { id: 8, name: 'Kum', color: 0xfde047 },
+            9: { id: 9, name: 'Çalışma Masası', color: 0xd97706, isWorkbench: true },
+            10: { id: 10, name: 'Tahta Kılıç', color: 0xb45309, isTool: true, damage: 5 },
+            11: { id: 11, name: 'Taş Kılıç', color: 0x64748b, isTool: true, damage: 8 },
+            12: { id: 12, name: 'Katman Kayası (Bedrock)', color: 0x0f172a, indestructible: true },
+            13: { id: 13, name: 'Kömür Madeni', color: 0x1e293b },
+            14: { id: 14, name: 'Demir Madeni', color: 0xd97706 },
+            15: { id: 15, name: 'Elmas Madeni', color: 0x06b6d4 },
+            16: { id: 16, name: 'Meşe Yaprağı', color: 0x15803d, transparent: true, opacity: 0.85 },
+            17: { id: 17, name: 'Çürük Et', color: 0x991b1b, isFood: true }
+        };
+
+        // OYUNCU ENVANTERİ (BAŞLANGIÇTA TAMAMEN BOŞ!)
+        let playerInventory = {};
+        for (let i = 1; i <= 27; i++) playerInventory[i] = { type: 0, count: 0 };
+
+        let selectedHotbarSlot = 1;
+        let activeCraftingMode = 2; // 2x2 veya 3x3
+        let craftGrid = [ [0,0,0], [0,0,0], [0,0,0] ];
+        let craftOutput = { type: 0, count: 0 };
+
+
+        /* ==========================================================================
+           3. THREE.JS VOXEL ENGINE & GAME LOGIC
+           ========================================================================== */
+        let scene, camera, renderer, controls;
+        let ambientLight, dirLight, moonLight;
+        let currentWorldName = "Minecraft Dünyam";
+        let currentWorldSeed = 987654;
+
+        const voxelMap = new Map();     // "x,y,z" -> { mesh, type, x, y, z }
+        const droppedItems = [];        // Düşen 3D eşyalar
+        const passiveMobs = [];         // İnek, Koyun, Domuz, Köylüler
+        const hostileZombies = [];      // Gece Zombileri
+
+        const blockGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const miniItemGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+
+        // FİZİK & OYUN KONTROLLERİ
+        const PLAYER_HEIGHT = 1.7;
+        const PLAYER_RADIUS = 0.3;
+        const GRAVITY = -26.0;
+        const JUMP_FORCE = 8.5;
+        const MOVE_SPEED = 7.0;
+
+        let playerPos = new THREE.Vector3(0, 45, 0);
+        let playerVel = new THREE.Vector3(0, 0, 0);
+        let isGrounded = false;
+        let isInWater = false;
+        let jumpRequested = false;
+
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let prevTime = performance.now();
+        let timeOfDay = 6.0; // 0-24 Saat döngüsü (6.0 = Sabah)
+        let dayCount = 1;
+
+        // Pointer Lock & Drag Look Fallback Variables
+        let isMouseDown = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let yaw = 0;
+        let pitch = 0;
+        let pointerLockSupported = true;
+
+        function init3DWorld() {
+            const container = document.getElementById('canvas-container');
+            container.innerHTML = '';
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x38bdf8);
+            scene.fog = new THREE.FogExp2(0x38bdf8, 0.008);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.rotation.order = 'YXZ';
+            camera.position.copy(playerPos);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Safe PointerLockControls Init with error handling
+            try {
+                controls = new THREE.PointerLockControls(camera, document.body);
+                scene.add(controls.getObject());
+
+                controls.addEventListener('unlock', () => {
+                    if (document.getElementById('main-menu').classList.contains('hidden') &&
+                        document.getElementById('modal-inventory').classList.contains('hidden') &&
+                        document.getElementById('modal-architecture').classList.contains('hidden')) {
+                        document.getElementById('pause-screen').classList.remove('hidden');
+                        document.getElementById('crosshair').classList.add('hidden');
+                    }
+                });
+
+                controls.addEventListener('lock', () => {
+                    document.getElementById('pause-screen').classList.add('hidden');
+                    document.getElementById('crosshair').classList.remove('hidden');
+                });
+            } catch (err) {
+                console.warn("Pointer Lock API not supported or blocked, falling back to drag controls.", err);
+                pointerLockSupported = false;
+            }
+
+            // Fallback Mouse/Touch Look Controls
+            window.addEventListener('mousedown', (e) => {
+                if (e.target.closest('#canvas-container')) {
+                    isMouseDown = true;
+                    previousMousePosition = { x: e.clientX, y: e.clientY };
+                }
+            });
+
+            window.addEventListener('mouseup', () => { isMouseDown = false; });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!controls || !controls.isLocked) {
+                    if (isMouseDown) {
+                        const deltaX = e.clientX - previousMousePosition.x;
+                        const deltaY = e.clientY - previousMousePosition.y;
+
+                        yaw -= deltaX * 0.003;
+                        pitch -= deltaY * 0.003;
+                        pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+
+                        camera.rotation.x = pitch;
+                        camera.rotation.y = yaw;
+                    }
+                }
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+
+            // Işıklandırma (Güneş & Ay)
+            ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            dirLight = new THREE.DirectionalLight(0xfffbeb, 1.2);
+            dirLight.position.set(50, 80, 30);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
+
+            setupInputListeners();
+            renderHotbarUI();
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        /* DÜNYA OLUŞTURMA: 20X DERİN YER KABUĞU, KATMAN KAYASI & KÖYLER */
+        function generateProceduralWorld(seed, biomeType) {
+            voxelMap.forEach(v => scene.remove(v.mesh));
+            voxelMap.clear();
+
+            const range = biomeType === 'flat' ? 14 : 35; // Devasa Dünya Çapı
+            let totalVoxels = 0;
+
+            for (let x = -range; x <= range; x++) {
+                for (let z = -range; z <= range; z++) {
+                    
+                    let height = 35; // Ortalama Karasal Yükseklik
+
+                    if (biomeType !== 'flat') {
+                        // Çok Katmanlı Perlin-Style Noise (Tepe, Dağ ve Nehir Yatağı)
+                        const noise1 = Math.sin((x + seed) * 0.04) * Math.cos((z + seed) * 0.04) * 16;
+                        const noise2 = Math.sin((x - seed) * 0.015 + z * 0.015) * 22;
+                        height = Math.floor(noise1 + noise2) + 36;
+                    }
+
+                    // KATMAN KADEMELERİ (YER KABUĞU EN DİBİNE KATMAN KAYASI)
+                    for (let y = 0; y <= height; y++) {
+                        let type = 3; // Taş
+
+                        if (y === 0) {
+                            type = 12; // Katman Kayası (Bedrock - Kırılamaz!)
+                        } else if (y === height && y >= 30) {
+                            type = 1; // Çim Blok
+                        } else if (y > height - 4 && y >= 30) {
+                            type = 2; // Toprak
+                        } else if (y < height - 12) {
+                            // Derin Madenler
+                            const rand = Math.random();
+                            if (y < 10 && rand < 0.04) type = 15;      // Elmas
+                            else if (y < 20 && rand < 0.10) type = 14; // Demir
+                            else if (y < 28 && rand < 0.18) type = 13; // Kömür
+                        }
+
+                        // Nehirler ve Deniz Seviyesi (Y <= 30)
+                        if (y === height && height < 30) {
+                            type = 8; // Sahil Kumu
+                        }
+
+                        createBlock(x, y, z, type);
+                        totalVoxels++;
+                    }
+
+                    // Su Katmanı (Nehir ve Göller)
+                    if (height < 30) {
+                        for (let wy = height + 1; wy <= 30; wy++) {
+                            createBlock(x, wy, z, 7); // Su
+                        }
+                    }
+
+                    // Meşe Ağaçları
+                    if (biomeType !== 'flat' && height >= 31 && x % 9 === 0 && z % 9 === 0 && Math.random() > 0.35) {
+                        spawnTree(x, height + 1, z);
+                    }
+                }
+            }
+
+            // KÖY OLUŞTURMA (VILLAGES)
+            if (biomeType !== 'flat') {
+                spawnVillage(12, 36, 12);
+                spawnVillage(-18, 36, -18);
+            }
+
+            // PASİF CANLILAR (COW, SHEEP, PIG, VILLAGERS)
+            spawnPassiveMobs(16);
+
+            document.getElementById('chunk-display') && (document.getElementById('chunk-display').innerText = Math.round((range * 2) ** 2 / 16));
+            showNotification(`Minecraft Dünyası Üretildi! (${totalVoxels.toLocaleString()} Blok)`);
+        }
+
+        /* MINECRAFT ÇİM BLOKLARI (ÜSTÜ YEŞİL, YANLARI TOPRAK METARYALİ) */
+        function createBlock(x, y, z, type) {
+            const key = `${x},${y},${z}`;
+            if (voxelMap.has(key)) return;
+
+            const info = BLOCK_TYPES[type];
+            let mesh;
+
+            if (info.isGrass) {
+                // 6 Yüzlü Çoklu Materyal (Üstü Yeşil, Yanları Toprak)
+                const matTop = new THREE.MeshStandardMaterial({ color: info.colorTop, roughness: 0.8 });
+                const matSide = new THREE.MeshStandardMaterial({ color: info.colorSide, roughness: 0.9 });
+                const materials = [matSide, matSide, matTop, matSide, matSide, matSide];
+                mesh = new THREE.Mesh(blockGeometry, materials);
+            } else {
+                const mat = new THREE.MeshStandardMaterial({
+                    color: info.color || 0xffffff,
+                    transparent: info.transparent || false,
+                    opacity: info.opacity || 1.0,
+                    roughness: 0.7
+                });
+                mesh = new THREE.Mesh(blockGeometry, mat);
+            }
+
+            mesh.position.set(x + 0.5, y + 0.5, z + 0.5);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+
+            scene.add(mesh);
+            voxelMap.set(key, { mesh, type, x, y, z });
+        }
+
+        function removeBlock(x, y, z) {
+            const key = `${x},${y},${z}`;
+            if (!voxelMap.has(key)) return;
+
+            const data = voxelMap.get(key);
+            if (BLOCK_TYPES[data.type].indestructible) {
+                showNotification('Katman Kayası (Bedrock) Kırılamaz!');
+                return;
+            }
+
+            scene.remove(data.mesh);
+            data.mesh.geometry.dispose();
+            voxelMap.delete(key);
+
+            // 3D Eşya Düşürme Entity
+            spawnDroppedItem(x + 0.5, y + 0.5, z + 0.5, data.type);
+        }
+
+        function getBlock(x, y, z) {
+            return voxelMap.get(`${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`);
+        }
+
+        function spawnTree(x, y, z) {
+            for (let i = 0; i < 5; i++) createBlock(x, y + i, z, 4);
+            for (let lx = -2; lx <= 2; lx++) {
+                for (let lz = -2; lz <= 2; lz++) {
+                    for (let ly = 3; ly <= 5; ly++) {
+                        if (Math.abs(lx) === 2 && Math.abs(lz) === 2) continue;
+                        createBlock(x + lx, y + ly, z + lz, 16);
+                    }
+                }
+            }
+        }
+
+        /* KÖY OLUŞTURUCU (VILLAGES) */
+        function spawnVillage(vx, vy, vz) {
+            // Köy Evleri ve Taş Yollar
+            for (let rx = -4; rx <= 4; rx++) {
+                for (let rz = -4; rz <= 4; rz++) {
+                    createBlock(vx + rx, vy, vz + rz, 3); // Taş Yol
+                }
+            }
+
+            // 1. Köylü Evi
+            for (let hx = 1; hx <= 4; hx++) {
+                for (let hz = 1; hz <= 4; hz++) {
+                    for (let hy = 1; hy <= 4; hy++) {
+                        if (hy === 1 || hy === 4 || hx === 1 || hx === 4 || hz === 1 || hz === 4) {
+                            createBlock(vx + hx, vy + hy, vz + hz, 5); // Tahta Duvarlar
+                        }
+                    }
+                }
+            }
+            createBlock(vx + 2, vy + 1, vz + 4, 9); // Çalışma Masası Ekle
+        }
+
+        /* ==========================================================================
+           4. DÜŞEN EŞYALAR VE MANYEİK TOPLAMA SİSTEMİ
+           ========================================================================== */
+        function spawnDroppedItem(x, y, z, type) {
+            const info = BLOCK_TYPES[type];
+            const mat = new THREE.MeshStandardMaterial({ color: info.color || info.colorTop || 0xffffff });
+            const itemMesh = new THREE.Mesh(miniItemGeometry, mat);
+            itemMesh.position.set(x, y, z);
+            scene.add(itemMesh);
+
+            droppedItems.push({
+                mesh: itemMesh,
+                type: type,
+                pos: new THREE.Vector3(x, y, z),
+                rotY: 0
+            });
+        }
+
+        function updateDroppedItems(delta) {
+            for (let i = droppedItems.length - 1; i >= 0; i--) {
+                const item = droppedItems[i];
+                item.rotY += delta * 2.5;
+                item.mesh.rotation.y = item.rotY;
+                item.mesh.position.y = item.pos.y + Math.sin(item.rotY * 4) * 0.12;
+
+                const dist = playerPos.distanceTo(item.mesh.position);
+                if (dist < 2.8) {
+                    item.mesh.position.lerp(playerPos, 0.18);
+                    if (dist < 0.9) {
+                        addItemToInventory(item.type, 1);
+                        showNotification(`Toplandı: +1 ${BLOCK_TYPES[item.type].name}`);
+
+                        scene.remove(item.mesh);
+                        item.mesh.geometry.dispose();
+                        droppedItems.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        function addItemToInventory(type, count) {
+            for (let i = 1; i <= 27; i++) {
+                if (playerInventory[i] && playerInventory[i].type === type) {
+                    playerInventory[i].count += count;
+                    renderHotbarUI();
+                    return;
+                }
+            }
+            for (let i = 1; i <= 27; i++) {
+                if (!playerInventory[i] || playerInventory[i].type === 0 || playerInventory[i].count === 0) {
+                    playerInventory[i] = { type, count };
+                    renderHotbarUI();
+                    return;
+                }
+            }
+        }
+
+        /* ==========================================================================
+           5. DÜŞMAN ZOMBİLER & KÖYLÜ CANLI SİSTEMİ
+           ========================================================================== */
+        function spawnPassiveMobs(count) {
+            passiveMobs.forEach(m => scene.remove(m.mesh));
+            passiveMobs.length = 0;
+
+            for (let i = 0; i < count; i++) {
+                const rx = (Math.random() - 0.5) * 40;
+                const rz = (Math.random() - 0.5) * 40;
+                
+                const group = new THREE.Group();
+                const isVillager = i < 4; // 4 Tane Köylü
+
+                const bodyGeo = new THREE.BoxGeometry(0.8, 1.2, 0.8);
+                const bodyMat = new THREE.MeshStandardMaterial({ color: isVillager ? 0x9a3412 : 0x78350f });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 0.6;
+                group.add(body);
+
+                // Kafa
+                const headGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+                const headMat = new THREE.MeshStandardMaterial({ color: isVillager ? 0xfdba74 : 0xffffff });
+                const head = new THREE.Mesh(headGeo, headMat);
+                head.position.set(0, 1.4, 0);
+                group.add(head);
+
+                group.position.set(rx, 40, rz);
+                scene.add(group);
+
+                passiveMobs.push({
+                    mesh: group,
+                    pos: group.position,
+                    vel: new THREE.Vector3(),
+                    isVillager: isVillager,
+                    moveTimer: 0
+                });
+            }
+        }
+
+        function spawnZombie(x, y, z) {
+            const group = new THREE.Group();
+            
+            // Zombi Gövdesi (Yeşil/Mavi Minecraft Stili)
+            const bodyGeo = new THREE.BoxGeometry(0.9, 1.4, 0.7);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x0284c7 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.7;
+            group.add(body);
+
+            const headGeo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0x15803d });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.set(0, 1.6, 0);
+            group.add(head);
+
+            group.position.set(x, y, z);
+            scene.add(group);
+
+            hostileZombies.push({
+                mesh: group,
+                pos: group.position,
+                health: 20
+            });
+        }
+
+        function updateMobs(delta) {
+            // Pasif Mobs & Köylüler
+            passiveMobs.forEach(mob => {
+                mob.moveTimer -= delta;
+                if (mob.moveTimer <= 0) {
+                    mob.vel.x = (Math.random() - 0.5) * 2.0;
+                    mob.vel.z = (Math.random() - 0.5) * 2.0;
+                    mob.moveTimer = 3.0 + Math.random() * 3.0;
+                }
+                mob.pos.x += mob.vel.x * delta;
+                mob.pos.z += mob.vel.z * delta;
+
+                const ground = getBlock(mob.pos.x, mob.pos.y, mob.pos.z);
+                if (!ground && mob.pos.y > 0) mob.pos.y -= 10 * delta;
+                else if (ground) mob.pos.y = ground.y + 1;
+
+                mob.mesh.rotation.y = Math.atan2(mob.vel.x, mob.vel.z);
+            });
+
+            // DÜŞMAN ZOMBİLER (GECE OYUNCUYU TAKİP EDER VE SALDIRIR)
+            for (let i = hostileZombies.length - 1; i >= 0; i--) {
+                const zombie = hostileZombies[i];
+                const dir = new THREE.Vector3().subVectors(playerPos, zombie.pos);
+                dir.y = 0;
+
+                if (dir.length() < 22.0) {
+                    dir.normalize();
+                    zombie.pos.x += dir.x * 3.2 * delta;
+                    zombie.pos.z += dir.z * 3.2 * delta;
+                    zombie.mesh.rotation.y = Math.atan2(dir.x, dir.z);
+
+                    // Oyuncuya Hasar Verme
+                    if (playerPos.distanceTo(zombie.pos) < 1.4) {
+                        showNotification('Zombi sana saldırdı! (-1 Can)');
+                    }
+                }
+            }
+
+            document.getElementById('mob-count') && (document.getElementById('mob-count').innerText = passiveMobs.length + hostileZombies.length);
+        }
+
+        /* ==========================================================================
+           6. GECE / GÜNDÜZ DÖNGÜSÜ SİSTEMİ
+           ========================================================================== */
+        function updateDayNightCycle(delta) {
+            timeOfDay += delta * 0.15; // Zaman akışı
+            if (timeOfDay >= 24.0) {
+                timeOfDay = 0.0;
+                dayCount++;
+            }
+
+            const clockStr = `${Math.floor(timeOfDay).toString().padStart(2, '0')}:00`;
+            document.getElementById('clock-display') && (document.getElementById('clock-display').innerText = clockStr);
+
+            // Güneş & Ay Açısı
+            const angle = (timeOfDay / 24.0) * Math.PI * 2;
+            dirLight.position.x = Math.cos(angle) * 80;
+            dirLight.position.y = Math.sin(angle) * 80;
+
+            const isNight = timeOfDay < 5.0 || timeOfDay > 19.0;
+            document.getElementById('day-display') && (document.getElementById('day-display').innerText = isNight ? `${dayCount}. Gece` : `${dayCount}. Gündüz`);
+
+            if (isNight) {
+                scene.background.setHex(0x020617);
+                scene.fog.color.setHex(0x020617);
+                ambientLight.intensity = 0.15;
+                dirLight.intensity = 0.2;
+
+                // GECE ZOMBİ SPAWN ETME
+                if (hostileZombies.length < 5 && Math.random() < 0.02) {
+                    const zx = playerPos.x + (Math.random() - 0.5) * 30;
+                    const zz = playerPos.z + (Math.random() - 0.5) * 30;
+                    spawnZombie(zx, 38, zz);
+                    showNotification('Karanlıkta bir Zombi belirdi!');
+                }
+            } else {
+                scene.background.setHex(0x38bdf8);
+                scene.fog.color.setHex(0x38bdf8);
+                ambientLight.intensity = 0.6;
+                dirLight.intensity = 1.2;
+            }
+        }
+
+        /* ==========================================================================
+           7. GERÇEK ÇARPIŞMA, SUDA YÜZME VE FİZİK ENGINE
+           ========================================================================== */
+        function checkVoxelCollision(pos) {
+            const minX = pos.x - PLAYER_RADIUS;
+            const maxX = pos.x + PLAYER_RADIUS;
+            const minY = pos.y - PLAYER_HEIGHT;
+            const maxY = pos.y + 0.1;
+            const minZ = pos.z - PLAYER_RADIUS;
+            const maxZ = pos.z + PLAYER_RADIUS;
+
+            for (let bx = Math.floor(minX); bx <= Math.floor(maxX); bx++) {
+                for (let by = Math.floor(minY); by <= Math.floor(maxY); by++) {
+                    for (let bz = Math.floor(minZ); bz <= Math.floor(maxZ); bz++) {
+                        const b = getBlock(bx, by, bz);
+                        if (b && !BLOCK_TYPES[b.type].isLiquid) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function updatePlayerPhysics(delta) {
+            const isPlaying = controls ? controls.isLocked : true;
+            if (!isPlaying && document.getElementById('main-menu').classList.contains('hidden') === false) return;
+
+            // Su Kontrolü
+            const currentBlock = getBlock(playerPos.x, playerPos.y - 1, playerPos.z);
+            isInWater = currentBlock && BLOCK_TYPES[currentBlock.type].isLiquid;
+
+            const forwardVector = new THREE.Vector3();
+            camera.getWorldDirection(forwardVector);
+            forwardVector.y = 0;
+            forwardVector.normalize();
+
+            const sideVector = new THREE.Vector3();
+            sideVector.crossVectors(camera.up, forwardVector).normalize();
+
+            const moveDir = new THREE.Vector3(0, 0, 0);
+            if (moveForward) moveDir.add(forwardVector);
+            if (moveBackward) moveDir.sub(forwardVector);
+            if (moveRight) moveDir.sub(sideVector);
+            if (moveLeft) moveDir.add(sideVector);
+
+            if (moveDir.lengthSq() > 0) moveDir.normalize();
+
+            const speed = isInWater ? MOVE_SPEED * 0.5 : MOVE_SPEED;
+            playerVel.x = moveDir.x * speed;
+            playerVel.z = moveDir.z * speed;
+
+            // Suda Yüzme veya Yeryüzü Yer Çekimi
+            if (isInWater) {
+                playerVel.y = jumpRequested ? 3.0 : -1.5;
+            } else {
+                playerVel.y += GRAVITY * delta;
+                if (jumpRequested && isGrounded) {
+                    playerVel.y = JUMP_FORCE;
+                    isGrounded = false;
+                    jumpRequested = false;
+                }
+            }
+
+            // AABB Çarpışma Testi
+            playerPos.x += playerVel.x * delta;
+            if (checkVoxelCollision(playerPos)) {
+                playerPos.x -= playerVel.x * delta;
+                playerVel.x = 0;
+            }
+
+            playerPos.z += playerVel.z * delta;
+            if (checkVoxelCollision(playerPos)) {
+                playerPos.z -= playerVel.z * delta;
+                playerVel.z = 0;
+            }
+
+            playerPos.y += playerVel.y * delta;
+            isGrounded = false;
+
+            if (checkVoxelCollision(playerPos)) {
+                if (playerVel.y < 0) isGrounded = true;
+                playerPos.y -= playerVel.y * delta;
+                playerVel.y = 0;
+            }
+
+            camera.position.copy(playerPos);
+        }
+
+        /* ==========================================================================
+           8. KRAFTLAMA SİSTEMİ (2x2 & 3x3 CRAFTING)
+           ========================================================================== */
+        function setCraftSlot(row, col, itemType) {
+            craftGrid[row][col] = itemType;
+            evaluateCraftingRecipes();
+        }
+
+        function evaluateCraftingRecipes() {
+            // Tarif Kontrolleri
+            const g = craftGrid;
+            craftOutput = { type: 0, count: 0 };
+
+            // 1. Meşe Odunu (4) -> 4 Meşe Tahtası (5)
+            if (g[0][0] === 4) craftOutput = { type: 5, count: 4 };
+            // 2. 2 Tahta (5) -> 4 Çubuk (6)
+            else if (g[0][0] === 5 && g[1][0] === 5) craftOutput = { type: 6, count: 4 };
+            // 3. 4 Tahta (5) -> 1 Çalışma Masası (9)
+            else if (g[0][0] === 5 && g[0][1] === 5 && g[1][0] === 5 && g[1][1] === 5) craftOutput = { type: 9, count: 1 };
+            // 4. Tahta Kılıç (10)
+            else if (g[0][0] === 5 && g[1][0] === 5 && g[2][0] === 6) craftOutput = { type: 10, count: 1 };
+
+            renderCraftingUI();
+        }
+
+        function claimCraftResult() {
+            if (craftOutput.type === 0) return;
+
+            addItemToInventory(craftOutput.type, craftOutput.count);
+            showNotification(`Üretildi: +${craftOutput.count} ${BLOCK_TYPES[craftOutput.type].name}`);
+
+            // Malzemeleri Eksilt
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                    if (craftGrid[r][c] > 0) craftGrid[r][c] = 0;
+                }
+            }
+            craftOutput = { type: 0, count: 0 };
+            renderCraftingUI();
+        }
+
+        function renderCraftingUI() {
+            const container = document.getElementById('crafting-grid-container');
+            container.innerHTML = '';
+            container.className = `grid grid-cols-${activeCraftingMode} gap-2`;
+
+            for (let r = 0; r < activeCraftingMode; r++) {
+                for (let c = 0; c < activeCraftingMode; c++) {
+                    const type = craftGrid[r][c];
+                    const info = BLOCK_TYPES[type] || { name: 'Boş', color: 0x1e293b };
+                    
+                    const slot = document.createElement('div');
+                    slot.className = "craft-slot flex flex-col items-center justify-center";
+                    slot.onclick = () => {
+                        // Elindeki aktif eşyayı kraft slotuna koy
+                        const activeItem = playerInventory[selectedHotbarSlot];
+                        if (activeItem && activeItem.count > 0) {
+                            craftGrid[r][c] = activeItem.type;
+                            activeItem.count--;
+                            renderHotbarUI();
+                            evaluateCraftingRecipes();
+                        }
+                    };
+                    slot.innerHTML = `<div class="w-5 h-5 rounded" style="background-color: #${(info.color || info.colorTop || 0x1e293b).toString(16).padStart(6, '0')}"></div>`;
+                    container.appendChild(slot);
+                }
+            }
+
+            // Çıktı Slotu
+            const outSlot = document.getElementById('craft-output-slot');
+            if (craftOutput.type > 0) {
+                const info = BLOCK_TYPES[craftOutput.type];
+                outSlot.innerHTML = `
+                    <div class="w-7 h-7 rounded shadow-lg" style="background-color: #${(info.color || info.colorTop).toString(16).padStart(6, '0')}"></div>
+                    <span class="text-[10px] font-bold text-emerald-300 mt-1">+${craftOutput.count}</span>
+                `;
+            } else {
+                outSlot.innerHTML = `<span class="text-xs text-slate-500">Boş</span>`;
+            }
+        }
+
+        /* ==========================================================================
+           9. GİRDİ LİSTENERS & ETKİLEŞİM
+           ========================================================================== */
+        function setupInputListeners() {
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'KeyE') {
+                    toggleInventoryModal();
+                    return;
+                }
+                switch (e.code) {
+                    case 'KeyW': case 'ArrowUp': moveForward = true; break;
+                    case 'KeyS': case 'ArrowDown': moveBackward = true; break;
+                    case 'KeyA': case 'ArrowLeft': moveLeft = true; break;
+                    case 'KeyD': case 'ArrowRight': moveRight = true; break;
+                    case 'Space': jumpRequested = true; break;
+                    case 'Digit1': selectHotbarSlot(1); break;
+                    case 'Digit2': selectHotbarSlot(2); break;
+                    case 'Digit3': selectHotbarSlot(3); break;
+                    case 'Digit4': selectHotbarSlot(4); break;
+                    case 'Digit5': selectHotbarSlot(5); break;
+                    case 'Digit6': selectHotbarSlot(6); break;
+                    case 'Digit7': selectHotbarSlot(7); break;
+                    case 'Digit8': selectHotbarSlot(8); break;
+                    case 'Digit9': selectHotbarSlot(9); break;
+                }
+            });
+
+            document.addEventListener('keyup', (e) => {
+                switch (e.code) {
+                    case 'KeyW': case 'ArrowUp': moveForward = false; break;
+                    case 'KeyS': case 'ArrowDown': moveBackward = false; break;
+                    case 'KeyA': case 'ArrowLeft': moveLeft = false; break;
+                    case 'KeyD': case 'ArrowRight': moveRight = false; break;
+                    case 'Space': jumpRequested = false; break;
+                }
+            });
+
+            document.addEventListener('mousedown', (e) => {
+                if (controls && !controls.isLocked && pointerLockSupported && e.target.closest('#canvas-container')) {
+                    try {
+                        controls.lock();
+                    } catch (err) {
+                        console.warn("Pointer lock lock() failed", err);
+                    }
+                }
+
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+                const meshes = Array.from(voxelMap.values()).map(v => v.mesh);
+                const intersects = raycaster.intersectObjects(meshes);
+
+                if (intersects.length > 0) {
+                    const hit = intersects[0];
+                    const point = hit.point;
+                    const normal = hit.face.normal;
+
+                    if (e.button === 0) {
+                        // SOL TIK: BLOĞU KIR VEYA ZOMBİYE SALDIR
+                        const bx = Math.floor(point.x - normal.x * 0.4);
+                        const by = Math.floor(point.y - normal.y * 0.4);
+                        const bz = Math.floor(point.z - normal.z * 0.4);
+
+                        const hitBlock = getBlock(bx, by, bz);
+                        if (hitBlock) {
+                            removeBlock(bx, by, bz);
+                        }
+                    } else if (e.button === 2) {
+                        // SAĞ TIK: BLOĞU KOY VEYA ÇALIŞMA MASASINI AÇ
+                        const bx = Math.floor(point.x - normal.x * 0.4);
+                        const by = Math.floor(point.y - normal.y * 0.4);
+                        const bz = Math.floor(point.z - normal.z * 0.4);
+                        const targetBlock = getBlock(bx, by, bz);
+
+                        if (targetBlock && BLOCK_TYPES[targetBlock.type].isWorkbench) {
+                            // 3x3 Kraft Modunu Aç
+                            activeCraftingMode = 3;
+                            document.getElementById('inventory-title-text').innerText = "Çalışma Masası (3x3 Kraftlama)";
+                            toggleInventoryModal();
+                            return;
+                        }
+
+                        const activeItem = playerInventory[selectedHotbarSlot];
+                        if (!activeItem || activeItem.count <= 0) {
+                            showNotification('Elinde yerleştirecek blok yok!');
+                            return;
+                        }
+
+                        const px = Math.floor(point.x + normal.x * 0.4);
+                        const py = Math.floor(point.y + normal.y * 0.4);
+                        const pz = Math.floor(point.z + normal.z * 0.4);
+
+                        createBlock(px, py, pz, activeItem.type);
+
+                        if (checkVoxelCollision(playerPos)) {
+                            removeBlock(px, py, pz);
+                            showNotification('Buraya koyamazsın!');
+                        } else {
+                            activeItem.count--;
+                            renderHotbarUI();
+                        }
+                    }
+                }
+            });
+        }
+
+        /* ==========================================================================
+           10. SAVE / LOAD SİSTEMİ & ARAYÜZ
+           ========================================================================== */
+        function saveCurrentWorld() {
+            const modifiedBlocks = [];
+            voxelMap.forEach(v => {
+                modifiedBlocks.push({ x: v.x, y: v.y, z: v.z, type: v.type });
+            });
+
+            const saveData = {
+                name: currentWorldName,
+                seed: currentWorldSeed,
+                playerPos: { x: playerPos.x, y: playerPos.y, z: playerPos.z },
+                inventory: playerInventory,
+                blocks: modifiedBlocks
+            };
+
+            localStorage.setItem(`craftium_save_${currentWorldName}`, JSON.stringify(saveData));
+            showNotification(`Dünya [${currentWorldName}] Kaydedildi!`);
+        }
+
+        function renderHotbarUI() {
+            const container = document.getElementById('hotbar-slots-container');
+            container.innerHTML = '';
+
+            for (let i = 1; i <= 9; i++) {
+                const item = playerInventory[i] || { type: 0, count: 0 };
+                const info = BLOCK_TYPES[item.type] || { name: 'Boş', color: 0x334155 };
+                const isActive = i === selectedHotbarSlot;
+
+                const slot = document.createElement('div');
+                slot.onclick = () => selectHotbarSlot(i);
+                slot.className = `hotbar-slot ${isActive ? 'active' : ''} flex flex-col items-center justify-center relative cursor-pointer`;
+                slot.innerHTML = `
+                    <div class="w-6 h-6 rounded" style="background-color: #${(info.color || info.colorTop || 0x334155).toString(16).padStart(6, '0')}"></div>
+                    <span class="text-[9px] font-bold text-slate-200 mt-0.5">${info.name}</span>
+                    <span class="absolute top-1 left-1.5 text-[9px] font-mono text-slate-400">${i}</span>
+                    ${item.count > 0 ? `<span class="absolute bottom-0.5 right-1.5 text-[10px] font-mono font-bold text-emerald-400">${item.count}</span>` : ''}
+                `;
+                container.appendChild(slot);
+            }
+        }
+
+        function selectHotbarSlot(idx) {
+            selectedHotbarSlot = idx;
+            renderHotbarUI();
+        }
+
+        function toggleInventoryModal() {
+            const modal = document.getElementById('modal-inventory');
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                if (controls.isLocked) controls.unlock();
+                renderFullInventoryGrid();
+                renderCraftingUI();
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function renderFullInventoryGrid() {
+            const grid = document.getElementById('inventory-grid');
+            grid.innerHTML = '';
+
+            for (let i = 1; i <= 27; i++) {
+                const item = playerInventory[i] || { type: 0, count: 0 };
+                const info = BLOCK_TYPES[item.type] || { name: 'Boş', color: 0x334155 };
+                
+                const cell = document.createElement('div');
+                cell.className = "w-14 h-14 bg-slate-900 border border-slate-700 rounded-xl flex flex-col items-center justify-center relative cursor-pointer hover:border-emerald-500";
+                cell.innerHTML = `
+                    <div class="w-6 h-6 rounded" style="background-color: #${(info.color || info.colorTop || 0x334155).toString(16).padStart(6, '0')}"></div>
+                    <span class="text-[9px] text-slate-300 mt-1">${info.name}</span>
+                    <span class="absolute bottom-1 right-1 text-[10px] font-bold text-emerald-400">${item.count || 0}</span>
+                `;
+                grid.appendChild(cell);
+            }
+        }
+
+        function startNewGame() {
+            currentWorldName = document.getElementById('input-world-name').value || "Minecraft Dünyam";
+            currentWorldSeed = parseInt(document.getElementById('input-world-seed').value) || 987654;
+            const biome = document.getElementById('select-biome').value;
+
+            document.getElementById('active-world-title').innerText = currentWorldName.toUpperCase();
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('crosshair').classList.remove('hidden');
+
+            generateProceduralWorld(currentWorldSeed, biome);
+
+            if (controls && pointerLockSupported) {
+                try {
+                    controls.lock();
+                } catch (e) {
+                    console.warn("Couldn't acquire pointer lock automatically:", e);
+                }
+            }
+        }
+
+        function returnToMainMenu() {
+            document.getElementById('pause-screen').classList.add('hidden');
+            document.getElementById('main-menu').classList.remove('hidden');
+        }
+
+        function switchTab(tab) {
+            document.getElementById('modal-architecture').classList.add('hidden');
+            if (tab === 'architecture') {
+                document.getElementById('modal-architecture').classList.remove('hidden');
+                if (controls.isLocked) controls.unlock();
+            }
+        }
+
+        function showNotification(msg) {
+            const box = document.getElementById('notification-box');
+            document.getElementById('notification-text').innerText = msg;
+            box.classList.remove('opacity-0');
+            setTimeout(() => box.classList.add('opacity-0'), 2400);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        /* ==========================================================================
+           11. MAIN ANIMATION LOOP
+           ========================================================================== */
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = performance.now();
+            const delta = Math.min((time - prevTime) / 1000, 0.1);
+
+            updatePlayerPhysics(delta);
+            updateDroppedItems(delta);
+            updateMobs(delta);
+            updateDayNightCycle(delta);
+
+            document.getElementById('pos-display') && (document.getElementById('pos-display').innerText = `X: ${Math.round(playerPos.x)}, Y: ${Math.round(playerPos.y)}, Z: ${Math.round(playerPos.z)}`);
+
+            prevTime = time;
+            renderer.render(scene, camera);
+        }
+
+        function initArchitectureViewer() {
+            const treeContainer = document.getElementById('file-tree');
+            treeContainer.innerHTML = '';
+
+            Object.keys(javaArchitectureFiles).forEach(filepath => {
+                const item = document.createElement('div');
+                item.className = "p-2 rounded-lg hover:bg-slate-800 cursor-pointer text-slate-300 flex items-center transition-colors";
+                item.innerHTML = `<i class="fa-solid fa-file-code text-emerald-400 mr-2"></i><span>${filepath}</span>`;
+                item.onclick = () => previewFileCode(filepath);
+                treeContainer.appendChild(item);
+            });
+
+            previewFileCode('core/src/com/craftium/game/world/ChunkGenerator.java');
+        }
+
+        function previewFileCode(filepath) {
+            document.getElementById('code-file-name').innerHTML = `<i class="fa-regular fa-file-code mr-2"></i>${filepath}`;
+            document.getElementById('code-preview-content').innerText = javaArchitectureFiles[filepath] || '// Dosya bulunamadı';
+        }
+
+        function copyCurrentCode() {
+            const code = document.getElementById('code-preview-content').innerText;
+            const tempInput = document.createElement('textarea');
+            tempInput.value = code;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showNotification('Java kodu panoya kopyalandı!');
+        }
+
+        window.onload = function() {
+            init3DWorld();
+            initArchitectureViewer();
+            animate();
+        };
+    </script>
+</body>
+</html>
