@@ -3,42 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Keraj'ın Oyun Portfolyosu</title>
+    <title>Keraj Games</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #121212; color: white; padding: 40px 20px; margin: 0; }
-        h1 { color: #00E676; font-size: 2.5em; margin-bottom: 10px; }
-        p { color: #aaa; margin-bottom: 40px; }
-        .container { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
-        .game-card { background: #1e1e1e; border: 1px solid #333; padding: 25px; border-radius: 12px; width: 250px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: transform 0.2s; }
+        h1 { color: #00E676; font-size: 2.8em; margin-bottom: 10px; }
+        p { color: #aaa; margin-bottom: 40px; font-size: 1.1em; }
+        .container { display: flex; flex-wrap: wrap; justify-content: center; gap: 25px; }
+        .game-card { background: #1e1e1e; border: 1px solid #333; padding: 20px; border-radius: 14px; width: 220px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: transform 0.2s; }
         .game-card:hover { transform: translateY(-5px); }
-        .game-card h2 { margin-top: 0; color: #fff; }
-        a { display: inline-block; padding: 12px 24px; background: #00E676; color: #000; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 15px; }
+        .game-card img { width: 100px; height: 100px; object-fit: cover; border-radius: 10px; margin-bottom: 10px; border: 2px solid #444; }
+        .game-card h2 { font-size: 1.1em; margin: 10px 0; color: #fff; }
+        a { display: inline-block; padding: 10px 20px; background: #00E676; color: #000; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 10px; }
         a:hover { background: #00c853; }
     </style>
 </head>
 <body>
-    <h1>🎮 Keraj'ın Oyun Dünyası</h1>
-    <p>Oynamak istediğin oyuna tıkla!</p>
+    <h1>🎮 Keraj Games</h1>
+    <p>Kendi yaptığım bağımsız oyunlar!</p>
 
     <div class="container">
+        <!-- KG Cycling Runner -->
         <div class="game-card">
-            <h2>🚴 KG Cycling Runner</h2>
-            <a href="KG Cycling Runner 0.3_index.html">Oyunu Oyna</a>
+            <img src="iko.png" alt="KG Cycling Runner">
+            <h2>KG Cycling Runner</h2>
+            <a href="KG Bisiklet Koşucusu 0.3_index.html">Oyna</a>
         </div>
 
+        <!-- Tracecraft -->
         <div class="game-card">
-            <h2>🕹️ Corci</h2>
-            <a href="corci_index.html">Oyunu Oyna</a>
+            <img src="Ekran görüntüsü_2026-10-26_20-38-54.png" alt="Tracecraft">
+            <h2>Tracecraft</h2>
+            <a href="tracecraft_index.html">Oyna</a>
         </div>
 
+        <!-- Corci -->
         <div class="game-card">
-            <h2>⚔️ Tracecraft</h2>
-            <a href="tracecraft_index.html">Oyunu Oyna</a>
+            <img src="Ekran görüntüsü_2026-10-26_20-41-46.png" alt="Corci">
+            <h2>Corci</h2>
+            <a href="corci_index.html">Oyna</a>
         </div>
 
+        <!-- Ay Oyunu -->
         <div class="game-card">
-            <h2>🌙 Ay Oyunu</h2>
-            <a href="ay_index.html">Oyunu Oyna</a>
+            <img src="ay.png" alt="Ay Oyunu">
+            <h2>Ay Oyunu</h2>
+            <a href="ay_index.html">Oyna</a>
         </div>
     </div>
 </body>
